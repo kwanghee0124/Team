@@ -109,8 +109,6 @@ if uploaded_file:
                     </div>
                     """
                 
-                # ★★★ 이 부분이 핵심입니다! ★★★
-                # 단순 출력이 아니라 HTML 허용 옵션을 넣어야 합니다.
                 st.markdown(f"""
                 <div class="team-card">
                     <div class="team-title">TEAM {idx + 1}</div>
