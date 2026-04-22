@@ -88,22 +88,29 @@ if uploaded_file:
             with cols[idx % 3]:
                 members_html = ""
                 for m in t_obj['members']:
+                    # 1. G1 강조용 배경색 및 뱃지 설정
                     is_g1 = "g1-bg" if m['그룹'] == 1 else ""
                     badge = '<span class="badge badge-g1">G1</span>' if m['그룹'] == 1 else ""
                     
-                    # 학번 포맷팅: .0을 제거하고 정수형 문자열로 변환
+                    # 2. 학번 .0 제거 (정수 변환)
                     try:
-                        student_id = str(int(float(m['학번']))) 
+                        student_id = str(int(float(m['학번'])))
                     except:
                         student_id = str(m['학번'])
                         
+                    # 3. 학년 정수 변환
+                    grade = int(float(m['학년']))
+
+                    # 각 멤버의 HTML 구조 생성
                     members_html += f"""
                     <div class="member-row {is_g1}">
                         <span class="member-name">{m['성명']}</span> {badge}<br>
-                        <span class="member-info">{int(m['학년'])}학년 | {student_id} | {m['학과']}</span>
+                        <span class="member-info">{grade}학년 | {student_id} | {m['학과']}</span>
                     </div>
                     """
                 
+                # ★★★ 이 부분이 핵심입니다! ★★★
+                # 단순 출력이 아니라 HTML 허용 옵션을 넣어야 합니다.
                 st.markdown(f"""
                 <div class="team-card">
                     <div class="team-title">TEAM {idx + 1}</div>
