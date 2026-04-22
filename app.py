@@ -124,14 +124,17 @@ if uploaded_file:
         df_clean = df_raw.iloc[:, [0, 5, 2, 3, 4, 6]].dropna(subset=[df_raw.columns[0], df_raw.columns[6]])
         df_clean.columns = ['그룹', '성별', '학년', '학과', '학번', '성명']
         df_clean['학과'] = df_clean['학과'].str.replace('SW융합대학 ', '').str.replace('프리무스국제대학 ', '')
-        df_clean['그룹'] = df_clean['그룹'].astype(float) # 셀렉트박스를 위해 float 명시
+        df_clean['그룹'] = df_clean['그룹'].astype(float) 
+        
+        df_clean = df_clean.sort_values(by=['그룹', '성명']).reset_index(drop=True)
     except:
         st.error("CSV 컬럼 구조가 맞지 않습니다.")
         st.stop()
 
-    # --- [추가] 데이터 에디터 (그룹 사전 수정) ---
-    with st.expander("📝 명단 사전 수정 (클릭해서 열기)", expanded=False):
-        st.info("💡 학생의 **'그룹' 열을 더블클릭**하면 1.0, 2.0, 3.0 중 하나로 직접 변경할 수 있습니다. 수정 완료 후 팀 구성을 생성하세요.")
+    # 상단: 그룹별 학생 명단 보기 및 수정창
+    with st.expander("👥 그룹별 학생 현황 및 명단 수정", expanded=True):
+        st.info("💡 표에서 학생의 **'그룹' 열을 더블클릭**하여 수정하세요. 수정한 즉시 아래의 그룹별 카드 현황에 반영됩니다.")
+        
         edited_df = st.data_editor(
             df_clean,
             use_container_width=True,
@@ -145,16 +148,33 @@ if uploaded_file:
                 )
             }
         )
+        
+        st.divider()
+        st.subheader("📊 현재 그룹별 학생 분포")
+        
+        c1, c2, c3 = st.columns(3)
+        for g_num, col in zip([1, 2, 3], [c1, c2, c3]):
+            g_data = edited_df[edited_df['그룹'] == float(g_num)].sort_values(by=['학년', '학번'])
+            inner = ""
+            for _, r in g_data.iterrows():
+                gender_str = "여" if r["성별"] == "여" else "남"
+                inner += f'<div class="student-card"><div style="color:#1f77b4; font-size:0.8em; font-weight:bold;">{r["학과"]}</div><div style="font-weight:bold;">{r["성명"]} ({gender_str})</div><div style="font-size:0.75em; color:gray;">{int(r["학년"])}학년 | {str(int(float(r["학번"])))}</div></div>'
+                
+            col.markdown(f'<div class="group-container"><h4>Group {g_num} ({len(g_data)}명)</h4>{inner}</div>', unsafe_allow_html=True)
+            
+    st.divider()
 
+    # 하단: 본격적인 팀 추첨 및 발표 영역
     if 'current_team_idx' not in st.session_state: st.session_state.current_team_idx = 0
     if 'teams_list' not in st.session_state: st.session_state.teams_list = []
     if 'stage' not in st.session_state: st.session_state.stage = "READY"
 
+    # [포인트] 메인 보드용 플레이스홀더를 하나만 생성해서 재활용합니다.
     announcement_placeholder = st.empty()
     
     if st.session_state.stage == "READY":
         if st.session_state.current_team_idx == 0:
-            announcement_placeholder.markdown('<div class="announcement-fixed-box"><div class="announcement-title">Welcome</div><p style="color:#ccc; font-size:1.2em;">전체 팀 구성을 생성한 뒤 발표를 시작하세요.</p></div>', unsafe_allow_html=True)
+            announcement_placeholder.markdown('<div class="announcement-fixed-box"><div class="announcement-title">Welcome</div><p style="color:#ccc; font-size:1.2em;">위에서 명단 확인 및 수정을 마친 뒤, 아래 버튼을 눌러 전체 팀 구성을 생성하세요.</p></div>', unsafe_allow_html=True)
         elif st.session_state.current_team_idx < 15:
             announcement_placeholder.markdown(f'<div class="announcement-fixed-box"><div class="announcement-title">✔️ {st.session_state.current_team_idx}팀 확정 완료!</div><p style="color:#fab005; font-size:1.2em; font-weight:bold;">➡️ 다음 {st.session_state.current_team_idx + 1}팀 발표를 시작해주세요.</p></div>', unsafe_allow_html=True)
         else:
@@ -162,20 +182,16 @@ if uploaded_file:
 
     c_btn = st.columns([1, 4])
     
-    # --- [수정] 전체 팀 구성 버튼 클릭 시 빠친코 애니메이션 연출 ---
+    # 전체 팀 구성 버튼 클릭
     if c_btn[0].button("🔥 전체 팀 구성 생성"):
-        anim_placeholder = st.empty()
         slots = ["🍒", "🍋", "🔔", "⭐", "💎", "7️⃣", "🍀", "🍉"]
         
-        # 슬롯머신 돌아가는 연출 (약 1.5초)
+        # [수정됨] 새로운 박스를 만들지 않고, 기존 announcement_placeholder에 덮어씁니다.
         for _ in range(15):
             s1, s2, s3 = random.choice(slots), random.choice(slots), random.choice(slots)
-            anim_placeholder.markdown(f'<div class="announcement-fixed-box"><div class="announcement-title">🔥 완벽한 밸런스를 계산 중입니다...</div><div class="slot-machine">{s1} {s2} {s3}</div></div>', unsafe_allow_html=True)
+            announcement_placeholder.markdown(f'<div class="announcement-fixed-box"><div class="announcement-title">🔥 완벽한 밸런스를 계산 중입니다...</div><div class="slot-machine">{s1} {s2} {s3}</div></div>', unsafe_allow_html=True)
             time.sleep(0.08)
             
-        anim_placeholder.empty() # 연출 종료 후 보드 삭제
-        
-        # 수정된 명단(edited_df)을 기반으로 팀 빌딩
         st.session_state.teams_list = create_perfectly_balanced_teams(edited_df)
         st.session_state.current_team_idx = 0
         st.session_state.stage = "READY"
@@ -228,7 +244,7 @@ if uploaded_file:
                 
             announcement_placeholder.markdown(f'<div class="announcement-fixed-box"><div class="announcement-title">✨ {idx+1}팀 구성 완료! ✨</div><div style="display:flex; gap:20px;">{cards}</div></div>', unsafe_allow_html=True)
 
-        # 하단 리스트
+        # 확정된 팀 명단 (최신순)
         if st.session_state.current_team_idx > 0:
             st.divider()
             st.subheader("📋 확정된 팀 명단 (최신순)")
@@ -247,15 +263,3 @@ if uploaded_file:
                     m_html += f'<div class="member-row {bg_class}"><div><b style="font-size:1.1em;">{m["성명"]}</b> ({gender_span}) {badge}</div><div style="font-size:0.85em; color:gray;">{int(m["학년"])}학년 | {m["학과"]}</div></div>'
                 
                 t_cols[v_idx % 3].markdown(f'<div class="team-card"><div class="team-title">TEAM {r_idx+1}</div>{m_html}</div>', unsafe_allow_html=True)
-
-    st.divider()
-    with st.expander("👥 그룹별 학생 명단 보기"):
-        c1, c2, c3 = st.columns(3)
-        for g_num, col in zip([1, 2, 3], [c1, c2, c3]):
-            g_data = edited_df[edited_df['그룹'] == float(g_num)].sort_values(by=['학년', '학번'])
-            inner = ""
-            for _, r in g_data.iterrows():
-                gender_str = "여" if r["성별"] == "여" else "남"
-                inner += f'<div class="student-card"><div style="color:#1f77b4; font-size:0.8em; font-weight:bold;">{r["학과"]}</div><div style="font-weight:bold;">{r["성명"]} ({gender_str})</div><div style="font-size:0.75em; color:gray;">{int(r["학년"])}학년 | {str(int(float(r["학번"])))}</div></div>'
-                
-            col.markdown(f'<div class="group-container"><h4>Group {g_num} ({len(g_data)}명)</h4>{inner}</div>', unsafe_allow_html=True)
