@@ -121,10 +121,7 @@ if uploaded_file:
     try:
         df_clean = df_raw.iloc[:, [0, 5, 2, 3, 4, 6]].dropna(subset=[df_raw.columns[0], df_raw.columns[6]])
         df_clean.columns = ['그룹', '성별', '학년', '학과', '학번', '성명']
-        
-        # [수정됨] 단과대학 이름 일괄 제거
         df_clean['학과'] = df_clean['학과'].str.replace('SW융합대학 ', '').str.replace('프리무스국제대학 ', '')
-        
     except:
         st.error("CSV 컬럼 구조가 맞지 않습니다. (그룹, 순번, 학년, 학과, 학번, 성별, 성명 순서여야 합니다)")
         st.stop()
@@ -177,6 +174,7 @@ if uploaded_file:
                 g_color = "#ff6b6b" if target['성별'] == '여' else "#4dabf7"
                 role_badge = '<span style="color:#fab005; font-size:1.2em;">👑 리더 (G1)</span>' if m_idx == 0 else f'<span>팀원 (G{int(target["그룹"])})</span>'
                 
+                # HTML 한 줄 처리
                 confirmed_cards += f'<div class="new-member-card"><div style="margin-bottom:10px;">{role_badge}</div><div class="new-member-name">{target["성명"]}</div><div style="color:{g_color}; font-weight:bold; font-size:1.2em;">{target["성별"]} | {int(target["학년"])}학년</div><div class="new-member-info">{target["학과"]}</div></div>'
                 announcement_placeholder.markdown(f'<div class="announcement-fixed-box"><div class="announcement-title">📢 {idx+1}팀 멤버 추첨 중!</div><div style="display:flex; gap:20px;">{confirmed_cards}</div></div>', unsafe_allow_html=True)
                 time.sleep(0.4)
@@ -193,14 +191,8 @@ if uploaded_file:
                 role_badge = '<span style="color:#fab005; font-size:1.2em;">👑 리더 (G1)</span>' if i == 0 else f'<span>팀원 (G{int(m["그룹"])})</span>'
                 g_color = "#ff6b6b" if m["성별"] == "여" else "#4dabf7"
                 
-                cards += f'''
-                <div class="new-member-card">
-                    <div style="margin-bottom:10px;">{role_badge}</div>
-                    <div class="new-member-name">{m["성명"]}</div>
-                    <div style="color:{g_color}; font-weight:bold; font-size:1.2em;">{m["성별"]} | {int(m["학년"])}학년</div>
-                    <div class="new-member-info">{m["학과"]}</div>
-                </div>
-                '''
+                # HTML 한 줄 처리
+                cards += f'<div class="new-member-card"><div style="margin-bottom:10px;">{role_badge}</div><div class="new-member-name">{m["성명"]}</div><div style="color:{g_color}; font-weight:bold; font-size:1.2em;">{m["성별"]} | {int(m["학년"])}학년</div><div class="new-member-info">{m["학과"]}</div></div>'
                 
             announcement_placeholder.markdown(f'<div class="announcement-fixed-box"><div class="announcement-title">✨ {idx+1}팀 구성 완료! ✨</div><div style="display:flex; gap:20px;">{cards}</div></div>', unsafe_allow_html=True)
 
@@ -220,12 +212,8 @@ if uploaded_file:
                     badge = '<span style="background:#fab005; color:white; padding:2px 6px; border-radius:4px; font-size:0.7em;">👑 G1 리더</span>' if i == 0 else f'<span style="background:#ced4da; color:white; padding:2px 6px; border-radius:4px; font-size:0.7em;">G{int(m["그룹"])}</span>'
                     gender_span = '<span class="gender-f">여</span>' if m["성별"] == "여" else '<span class="gender-m">남</span>'
                     
-                    m_html += f'''
-                    <div class="member-row {bg_class}">
-                        <div><b style="font-size:1.1em;">{m["성명"]}</b> ({gender_span}) {badge}</div>
-                        <div style="font-size:0.85em; color:gray;">{int(m["학년"])}학년 | {m["학과"]}</div>
-                    </div>
-                    '''
+                    # HTML 한 줄 처리
+                    m_html += f'<div class="member-row {bg_class}"><div><b style="font-size:1.1em;">{m["성명"]}</b> ({gender_span}) {badge}</div><div style="font-size:0.85em; color:gray;">{int(m["학년"])}학년 | {m["학과"]}</div></div>'
                 
                 t_cols[v_idx % 3].markdown(f'<div class="team-card"><div class="team-title">TEAM {r_idx+1}</div>{m_html}</div>', unsafe_allow_html=True)
 
@@ -237,11 +225,8 @@ if uploaded_file:
             inner = ""
             for _, r in g_data.iterrows():
                 gender_str = "여" if r["성별"] == "여" else "남"
-                inner += f'''
-                <div class="student-card">
-                    <div style="color:#1f77b4; font-size:0.8em; font-weight:bold;">{r["학과"]}</div>
-                    <div style="font-weight:bold;">{r["성명"]} ({gender_str})</div>
-                    <div style="font-size:0.75em; color:gray;">{int(r["학년"])}학년 | {str(int(float(r["학번"])))}</div>
-                </div>
-                '''
+                
+                # HTML 한 줄 처리
+                inner += f'<div class="student-card"><div style="color:#1f77b4; font-size:0.8em; font-weight:bold;">{r["학과"]}</div><div style="font-weight:bold;">{r["성명"]} ({gender_str})</div><div style="font-size:0.75em; color:gray;">{int(r["학년"])}학년 | {str(int(float(r["학번"])))}</div></div>'
+                
             col.markdown(f'<div class="group-container"><h4>Group {g_num} ({len(g_data)}명)</h4>{inner}</div>', unsafe_allow_html=True)
