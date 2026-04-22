@@ -163,7 +163,6 @@ if uploaded_file:
                     time.sleep(0.06)
                 
                 g_color = "#ff6b6b" if target['성별'] == '여' else "#4dabf7"
-                # 리더(배열의 0번째 멤버)는 왕관 표시
                 role_badge = '<span style="color:#fab005; font-size:1.2em;">👑 리더 (G1)</span>' if m_idx == 0 else f'<span>팀원 (G{int(target["그룹"])})</span>'
                 
                 confirmed_cards += f'<div class="new-member-card"><div style="margin-bottom:10px;">{role_badge}</div><div class="new-member-name">{target["성명"]}</div><div style="color:{g_color}; font-weight:bold; font-size:1.2em;">{target["성별"]} | {int(target["학년"])}학년</div><div class="new-member-info">{target["학과"]}</div></div>'
@@ -172,13 +171,28 @@ if uploaded_file:
             st.session_state.stage = "FINISHED"
             st.rerun()
 
+        # [수정됨] 완료된 카드 출력 부분 (따옴표 에러 방지를 위해 변수 분리)
         if st.session_state.stage == "FINISHED":
             idx = st.session_state.current_team_idx
             members = st.session_state.teams_list[idx]
-            cards = "".join([f'<div class="new-member-card"><div style="margin-bottom:10px;">{"<span style=\'color:#fab005; font-size:1.2em;\'>👑 리더 (G1)</span>" if i==0 else f"<span>팀원 (G{int(m[\'그룹\'])})</span>"}</div><div class="new-member-name">{m["성명"]}</div><div style="color:{"#ff6b6b" if m["성별"]=="여" else "#4dabf7"}; font-weight:bold; font-size:1.2em;">{m["성별"]} | {int(m["학년"])}학년</div><div class="new-member-info">{m["학과"]}</div></div>' for i, m in enumerate(members)])
+            
+            cards = ""
+            for i, m in enumerate(members):
+                role_badge = '<span style="color:#fab005; font-size:1.2em;">👑 리더 (G1)</span>' if i == 0 else f'<span>팀원 (G{int(m["그룹"])})</span>'
+                g_color = "#ff6b6b" if m["성별"] == "여" else "#4dabf7"
+                
+                cards += f'''
+                <div class="new-member-card">
+                    <div style="margin-bottom:10px;">{role_badge}</div>
+                    <div class="new-member-name">{m["성명"]}</div>
+                    <div style="color:{g_color}; font-weight:bold; font-size:1.2em;">{m["성별"]} | {int(m["학년"])}학년</div>
+                    <div class="new-member-info">G{int(m["그룹"])} | {m["학과"]}</div>
+                </div>
+                '''
+                
             announcement_placeholder.markdown(f'<div class="announcement-fixed-box"><div class="announcement-title">✨ {idx+1}팀 구성 완료! ✨</div><div style="display:flex; gap:20px;">{cards}</div></div>', unsafe_allow_html=True)
 
-        # 하단 리스트 (최신순)
+        # [수정됨] 하단 리스트 (최신순)
         if st.session_state.current_team_idx > 0:
             st.divider()
             st.subheader("📋 확정된 팀 명단 (최신순)")
@@ -187,12 +201,19 @@ if uploaded_file:
             indices.reverse()
             for v_idx, r_idx in enumerate(indices):
                 team = st.session_state.teams_list[r_idx]
+                
                 m_html = ""
                 for i, m in enumerate(team):
-                    bg_class = "leader-bg" if i == 0 else "normal-bg" # 리더는 노란 배경
+                    bg_class = "leader-bg" if i == 0 else "normal-bg"
                     badge = '<span style="background:#fab005; color:white; padding:2px 6px; border-radius:4px; font-size:0.7em;">👑 G1 리더</span>' if i == 0 else f'<span style="background:#ced4da; color:white; padding:2px 6px; border-radius:4px; font-size:0.7em;">G{int(m["그룹"])}</span>'
-                    gender = f'<span class="gender-f">여</span>' if m["성별"]=="여" else f'<span class="gender-m">남</span>'
-                    m_html += f'<div class="member-row {bg_class}"><div><b style="font-size:1.1em;">{m["성명"]}</b> ({gender}) {badge}</div><div style="font-size:0.85em; color:gray;">{int(m["학년"])}학년 | {m["학과"]}</div></div>'
+                    gender_span = '<span class="gender-f">여</span>' if m["성별"] == "여" else '<span class="gender-m">남</span>'
+                    
+                    m_html += f'''
+                    <div class="member-row {bg_class}">
+                        <div><b style="font-size:1.1em;">{m["성명"]}</b> ({gender_span}) {badge}</div>
+                        <div style="font-size:0.85em; color:gray;">{int(m["학년"])}학년 | {m["학과"]}</div>
+                    </div>
+                    '''
                 
                 t_cols[v_idx % 3].markdown(f'<div class="team-card"><div class="team-title">TEAM {r_idx+1}</div>{m_html}</div>', unsafe_allow_html=True)
 
@@ -201,5 +222,15 @@ if uploaded_file:
         c1, c2, c3 = st.columns(3)
         for g_num, col in zip([1, 2, 3], [c1, c2, c3]):
             g_data = df_clean[df_clean['그룹'] == float(g_num)].sort_values(by=['학년', '학번'])
-            inner = "".join([f'<div class="student-card"><div style="color:#1f77b4; font-size:0.8em; font-weight:bold;">{r["학과"].replace("SW융합대학 ","")}</div><div style="font-weight:bold;">{r["성명"]} ({"여" if r["성별"]=="여" else "남"})</div><div style="font-size:0.75em; color:gray;">{int(r["학년"])}학년 | {str(int(float(r["학번"])))}</div></div>' for _, r in g_data.iterrows()])
+            inner = ""
+            for _, r in g_data.iterrows():
+                gender_str = "여" if r["성별"] == "여" else "남"
+                dept = r["학과"].replace("SW융합대학 ", "")
+                inner += f'''
+                <div class="student-card">
+                    <div style="color:#1f77b4; font-size:0.8em; font-weight:bold;">{dept}</div>
+                    <div style="font-weight:bold;">{r["성명"]} ({gender_str})</div>
+                    <div style="font-size:0.75em; color:gray;">{int(r["학년"])}학년 | {str(int(float(r["학번"])))}</div>
+                </div>
+                '''
             col.markdown(f'<div class="group-container"><h4>Group {g_num} ({len(g_data)}명)</h4>{inner}</div>', unsafe_allow_html=True)
