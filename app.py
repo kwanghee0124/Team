@@ -128,11 +128,7 @@ if uploaded_file:
         st.error("CSV 컬럼 구조가 맞지 않습니다.")
         st.stop()
 
-    # ==========================================
-    # 1. 상단: 명단 수정창 (기본 닫힘) & 현황 상시 노출
-    # ==========================================
-    
-    # 수정창만 최소화 (기본 닫힘)
+    # 상단: 명단 수정창 (기본 닫힘) & 현황 상시 노출
     with st.expander("📝 전체 학생 명단 확인 및 수정 (클릭하여 열기)", expanded=False):
         st.info("💡 표에서 학생의 **'그룹' 열을 더블클릭**하여 1.0, 2.0, 3.0 중 하나로 직접 변경할 수 있습니다. 수정한 즉시 현황에 반영됩니다.")
         edited_df = st.data_editor(
@@ -151,7 +147,6 @@ if uploaded_file:
         
     st.divider()
     
-    # 그룹별 학생 현황은 밖으로 빼서 상시 노출
     st.subheader("📊 현재 그룹별 학생 분포")
     
     c1, c2, c3 = st.columns(3)
@@ -167,9 +162,7 @@ if uploaded_file:
             
     st.divider()
 
-    # ==========================================
-    # 2. 하단: 본격적인 팀 추첨 및 발표 영역
-    # ==========================================
+    # 하단: 본격적인 팀 추첨 및 발표 영역
     if 'current_team_idx' not in st.session_state: st.session_state.current_team_idx = 0
     if 'teams_list' not in st.session_state: st.session_state.teams_list = []
     if 'stage' not in st.session_state: st.session_state.stage = "READY"
@@ -182,7 +175,7 @@ if uploaded_file:
         elif st.session_state.current_team_idx < 15:
             announcement_placeholder.markdown(f'<div class="announcement-fixed-box"><div class="announcement-title">✔️ {st.session_state.current_team_idx}팀 확정 완료!</div><p style="color:#fab005; font-size:1.2em; font-weight:bold;">➡️ 다음 {st.session_state.current_team_idx + 1}팀 발표를 시작해주세요.</p></div>', unsafe_allow_html=True)
         else:
-            announcement_placeholder.markdown('<div class="announcement-fixed-box"><div class="announcement-title">🎉 모든 팀 구성이 완료되었습니다! 🎉</div><p style="color:#ccc; font-size:1.2em;">수고하셨습니다.</p></div>', unsafe_allow_html=True)
+            announcement_placeholder.markdown('<div class="announcement-fixed-box"><div class="announcement-title">🎉 모든 팀 구성이 완료되었습니다! 🎉</div><p style="color:#ccc; font-size:1.2em;">하단의 결과 리스트에서 CSV 다운로드가 가능합니다.</p></div>', unsafe_allow_html=True)
 
     c_btn = st.columns([1, 4])
     
@@ -243,10 +236,40 @@ if uploaded_file:
                 
             announcement_placeholder.markdown(f'<div class="announcement-fixed-box"><div class="announcement-title">✨ {idx+1}팀 구성 완료! ✨</div><div style="display:flex; gap:20px;">{cards}</div></div>', unsafe_allow_html=True)
 
-        # 확정된 팀 명단 (최신순)
+        # 확정된 팀 명단 (최신순) 및 CSV 다운로드 버튼
         if st.session_state.current_team_idx > 0:
             st.divider()
-            st.subheader("📋 확정된 팀 명단 (최신순)")
+            
+            c_title, c_down = st.columns([3, 1])
+            c_title.subheader("📋 확정된 팀 명단 (최신순)")
+            
+            # 모든 팀이 확정되었을 때만 다운로드 버튼 표시
+            if st.session_state.current_team_idx == 15:
+                export_data = []
+                for t_idx, team in enumerate(st.session_state.teams_list):
+                    for m_idx, m in enumerate(team):
+                        export_data.append({
+                            "팀": f"{t_idx + 1}팀",
+                            "역할": "리더 (G1)" if m_idx == 0 else f"팀원 (G{int(m['그룹'])})",
+                            "학번": str(int(float(m["학번"]))),
+                            "성명": m["성명"],
+                            "학과": m["학과"],
+                            "학년": int(m["학년"]),
+                            "성별": m["성별"],
+                            "그룹": int(m["그룹"])
+                        })
+                df_export = pd.DataFrame(export_data)
+                # utf-8-sig 인코딩으로 엑셀 한글 깨짐 방지
+                csv_data = df_export.to_csv(index=False).encode('utf-8-sig')
+                
+                c_down.download_button(
+                    label="📥 최종 결과 다운로드 (CSV)",
+                    data=csv_data,
+                    file_name="오픈소스SW기초_팀배정결과.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+                
             t_cols = st.columns(3)
             indices = list(range(st.session_state.current_team_idx))
             indices.reverse()
