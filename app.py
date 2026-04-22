@@ -73,7 +73,7 @@ if uploaded_file:
 
     st.divider()
 
-    # 2. 팀 추첨 로직
+    # 2. 팀 추첨 로직 및 상태 관리
     if 'current_team_idx' not in st.session_state: st.session_state.current_team_idx = 0
     if 'teams_list' not in st.session_state: st.session_state.teams_list = []
     if 'last_drawn_idx' not in st.session_state: st.session_state.last_drawn_idx = -1
@@ -85,9 +85,14 @@ if uploaded_file:
         st.rerun()
 
     if st.session_state.teams_list:
+        # 버튼 영역
+        btn_placeholder = st.empty()
+        
         if st.session_state.current_team_idx < 15:
-            if st.button(f"➡️ {st.session_state.current_team_idx + 1}팀 추첨하기"):
+            # 버튼을 누르면 즉시 세션 상태를 업데이트하고 애니메이션 실행을 준비함
+            if btn_placeholder.button(f"➡️ {st.session_state.current_team_idx + 1}팀 추첨하기"):
                 st.session_state.current_team_idx += 1
+                # 인덱스 증가 후 즉시 아래 애니메이션 로직으로 진입
         
         st.subheader(f"🎊 배정 결과 ({st.session_state.current_team_idx}/15)")
         t_cols = st.columns(3)
@@ -96,26 +101,27 @@ if uploaded_file:
             with t_cols[i % 3]:
                 team_members = st.session_state.teams_list[i]
                 
-                # [수정 포인트] 새로 뽑는 팀의 애니메이션 처리
+                # 방금 인덱스가 올라간 새 팀에 대해서만 애니메이션 실행
                 if i == st.session_state.current_team_idx - 1 and st.session_state.last_drawn_idx < i:
                     placeholder = st.empty()
-                    # 룰렛 애니메이션 (한 명씩 순차적으로 결정되는 연출)
                     confirmed_html = ""
+                    
                     for m_idx, final_m in enumerate(team_members):
-                        for _ in range(5): # 룰렛 횟수
+                        for _ in range(5):
                             temp = df_clean.sample(1).iloc[0]
                             temp_row = f'<div class="member-row" style="border: 1px dashed #ccc;"><div class="roulette-text">🎲 추첨 중...</div><div style="color:#aaa;">{temp["성명"]}</div></div>'
                             placeholder.markdown(f'<div class="team-card"><div class="team-title">TEAM {i+1}</div>{confirmed_html}{temp_row}</div>', unsafe_allow_html=True)
                             time.sleep(0.06)
                         
-                        # 한 명 확정
                         is_g1 = "g1-bg" if float(final_m['그룹']) == 1.0 else ""
                         badge = '<span class="badge">G1</span>' if float(final_m['그룹']) == 1.0 else ""
                         confirmed_html += f'<div class="member-row {is_g1}"><div><span class="member-name">{final_m["성명"]}</span>{badge}</div><div class="member-info" style="font-size:0.8em; color:gray;">{int(final_m["학년"])}학년 | {str(int(float(final_m["학번"])))} | {final_m["학과"]}</div></div>'
                         placeholder.markdown(f'<div class="team-card"><div class="team-title">TEAM {i+1}</div>{confirmed_html}</div>', unsafe_allow_html=True)
                     
-                    st.session_state.last_drawn_idx = i # 애니메이션 완료 기록
+                    st.session_state.last_drawn_idx = i
+                    # 애니메이션이 모두 끝난 후, 버튼 텍스트를 갱신하기 위해 강제 rerun
+                    st.rerun() 
                 else:
-                    # 이미 확정된 팀은 정적으로 한 번에 출력
+                    # 이미 애니메이션이 끝난 팀들
                     m_html = "".join([f'<div class="member-row {"g1-bg" if float(m["그룹"])==1.0 else ""}"><div><span class="member-name">{m["성명"]}</span>{"<span class=\"badge\">G1</span>" if float(m["그룹"])==1.0 else ""}</div><div style="font-size:0.8em; color:gray;">{int(m["학년"])}학년 | {str(int(float(m["학번"])))} | {m["학과"]}</div></div>' for m in team_members])
                     st.markdown(f'<div class="team-card"><div class="team-title">TEAM {i+1}</div>{m_html}</div>', unsafe_allow_html=True)
