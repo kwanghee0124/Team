@@ -37,13 +37,12 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 def create_strictly_balanced_teams(df_clean):
-    # 1. 데이터 분리 및 셔플
+    # 1. 그룹별/성별 데이터 분리
     def get_split(group_num):
         group_data = [x for x in df_clean.to_dict('records') if x['그룹'] == float(group_num)]
         m = [x for x in group_data if x['성별'] == '남']
         f = [x for x in group_data if x['성별'] == '여']
-        random.shuffle(m)
-        random.shuffle(f)
+        random.shuffle(m); random.shuffle(f)
         return m, f
 
     g1_m, g1_f = get_split(1)
@@ -53,46 +52,49 @@ def create_strictly_balanced_teams(df_clean):
     num_teams = 15
     teams = [[] for _ in range(num_teams)]
 
-    # [핵심 제약 조건 적용]
-    # 15개 팀 중 그룹 1과 그룹 2를 팀당 1명씩 배타적으로 배정
-    # 그룹 1 인원수만큼 팀을 채우고, 나머지는 그룹 2로 채움 (절대 겹치지 않음)
+    # [규칙 1] 모든 팀에 G1 또는 G2를 1명씩 배타적으로 배정 (리더격)
+    # G1과 G2가 섞이지 않도록 순차적으로 풀(Pool) 구성
+    leader_pool = (g1_f + g1_m) + (g2_f + g2_m)
     
-    # 그룹 1과 그룹 2 명단을 성별 밸런스를 위해 여학생부터 섞음
-    all_leaders = []
-    # 그룹 1 여 -> 남 순서로 준비
-    g1_pool = g1_f + g1_m
-    # 그룹 2 여 -> 남 순서로 준비
-    g2_pool = g2_f + g2_m
-    
-    # 15개 팀에 리더(G1 or G2) 배정
     for i in range(num_teams):
-        if g1_pool:
-            teams[i].append(g1_pool.pop(0))
-        elif g2_pool:
-            teams[i].append(g2_pool.pop(0))
+        if leader_pool:
+            teams[i].append(leader_pool.pop(0))
 
-    # 2. 성별 균형을 위해 남은 여학생들(G2 일부 + G3 전체) 분산 배치
-    remaining_females = g2_pool + g3_f # G2에서 리더로 안 뽑힌 여학생 + G3 여학생
-    random.shuffle(remaining_females)
-    
+    # [규칙 2] 여학생 분산 배치 (팀당 여학생 최대 2명 제한)
+    # 아직 배치되지 않은 나머지 여학생들 모으기
+    all_remaining_f = [x for x in (g1_f + g1_m + g2_f + g2_m + g3_f + g3_m) if x not in [m for t in teams for m in t] and x['성별'] == '여']
+    random.shuffle(all_remaining_f)
+
+    # 모든 팀을 돌면서 여학생이 1명도 없는 팀에 우선 배치
     for i in range(num_teams):
-        # 팀당 최소 1명의 여학생을 목표로 배치 (이미 리더가 여학생인 경우 제외)
         if not any(m['성별'] == '여' for m in teams[i]):
-            if remaining_females:
-                teams[i].append(remaining_females.pop(0))
+            if all_remaining_f:
+                teams[i].append(all_remaining_f.pop(0))
 
-    # 3. 나머지 자리 G3(남) 및 G2(남)으로 채우기
-    remaining_males = g2_pool + g3_m
-    random.shuffle(remaining_males)
+    # [규칙 3] 나머지 인원 채우기 (G3 위주)
+    # 아직 아무 팀에도 속하지 않은 모든 인원 모으기
+    all_remaining_students = [x for x in (g1_m + g1_f + g2_m + g2_f + g3_m + g3_f) if x not in [m for t in teams for m in t]]
+    random.shuffle(all_remaining_students)
 
     for i in range(num_teams):
         while len(teams[i]) < 3:
-            if remaining_females:
-                teams[i].append(remaining_females.pop(0))
-            elif remaining_males:
-                teams[i].append(remaining_males.pop(0))
+            if not all_remaining_students: break
+            
+            # 현재 팀의 여학생 수 확인
+            current_f_count = len([m for m in teams[i] if m['성별'] == '여'])
+            
+            # 다음 뽑을 학생이 여학생인데 이미 팀에 여학생이 2명이면 패스하고 남학생 찾기
+            next_student = all_remaining_students[0]
+            if next_student['성별'] == '여' and current_f_count >= 2:
+                # 남학생을 찾아서 먼저 뽑음
+                male_idx = next((idx for idx, s in enumerate(all_remaining_students) if s['성별'] == '남'), None)
+                if male_idx is not None:
+                    teams[i].append(all_remaining_students.pop(male_idx))
+                else:
+                    # 남학생이 아예 없으면 어쩔 수 없이 여학생 추가 (인원수 맞추기 위해)
+                    teams[i].append(all_remaining_students.pop(0))
             else:
-                break
+                teams[i].append(all_remaining_students.pop(0))
 
     random.shuffle(teams)
     return teams
