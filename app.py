@@ -5,10 +5,8 @@ import random
 
 st.set_page_config(page_title="오픈소스SW기초 팀 배정", layout="wide")
 
-# CSS 스타일 정의
 st.markdown("""
     <style>
-    /* 1. 고정 발표 보드 디자인 (흔들림 방지) */
     .announcement-fixed-box {
         background: linear-gradient(135deg, #1a1a1a 0%, #2d3436 100%);
         border-radius: 25px; padding: 40px; margin-bottom: 20px;
@@ -18,8 +16,6 @@ st.markdown("""
         border: 2px solid #444;
     }
     .announcement-title { font-size: 1.8em; font-weight: 800; margin-bottom: 30px; color: #fab005; }
-    
-    /* 2. 발표 카드 디자인 (이름 크게) */
     .new-member-card {
         background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255,255,255,0.3);
         border-radius: 20px; padding: 25px; width: 280px; text-align: center;
@@ -27,7 +23,6 @@ st.markdown("""
     .new-member-name { font-size: 2.5em; font-weight: 900; color: #fff; margin-bottom: 5px; }
     .new-member-info { font-size: 1.1em; color: #ccc; }
     
-    /* 3. 하단 명단 카드 */
     .team-card {
         background-color: #ffffff; border-radius: 12px; padding: 20px;
         margin-bottom: 20px; border: 1px solid #e1e4e8;
@@ -39,7 +34,6 @@ st.markdown("""
     .gender-f { color: #ff6b6b; font-weight: bold; }
     .gender-m { color: #4dabf7; font-weight: bold; }
     
-    /* 4. 그룹 현황 학생 카드 (2열 배치) */
     .student-card {
         background-color: #ffffff; border-radius: 8px; padding: 8px;
         margin: 4px; border: 1px solid #e1e4e8;
@@ -54,61 +48,62 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 팀 빌딩 알고리즘 ---
-def create_balanced_teams(df_clean):
-    def get_refined_split(group_num):
-        data = [x for x in df_clean.to_dict('records') if x['그룹'] == float(group_num)]
-        if group_num == 1:
-            low = [x for x in data if int(float(x['학년'])) < 4]
-            high = [x for x in data if int(float(x['학년'])) >= 4]
-            random.shuffle(low); random.shuffle(high)
-            return low, high
-        m = [x for x in data if x['성별'] == '남']
-        f = [x for x in data if x['성별'] == '여']
-        random.shuffle(m); random.shuffle(f)
-        return m, f
+# --- 팀 빌딩 알고리즘 (성별 균등 분배 핵심 로직) ---
+def create_perfectly_balanced_teams(df_clean):
+    g1 = [x for x in df_clean.to_dict('records') if x['그룹'] == 1.0]
+    g2 = [x for x in df_clean.to_dict('records') if x['그룹'] == 2.0]
+    g3 = [x for x in df_clean.to_dict('records') if x['그룹'] == 3.0]
 
-    g1_low, g1_high = get_refined_split(1)
-    g2_m, g2_f = get_refined_split(2)
-    g3_m, g3_f = get_refined_split(3)
+    random.shuffle(g1); random.shuffle(g2); random.shuffle(g3)
 
     num_teams = 15
     teams = [[] for _ in range(num_teams)]
 
-    # [1] G2가 들어가지 않을 팀(G3가 2명 들어갈 팀) 계산
-    num_g2 = len(g2_m) + len(g2_f)
-    num_no_g2_teams = max(0, num_teams - num_g2)
-    
-    # [2] 리더격(G1/G2) 배치
-    # G2 없는 팀(G3 2명 팀)에는 무조건 G1 저학년 배치
-    for i in range(num_no_g2_teams):
+    # [1] G1, G2 골격 짜기 (팀마다 G1, G2 1명씩 / G2 없으면 G1 저학년)
+    num_g2 = len(g2)
+    num_no_g2 = max(0, num_teams - num_g2)
+
+    g1_low = [x for x in g1 if int(float(x['학년'])) < 4]
+    g1_high = [x for x in g1 if int(float(x['학년'])) >= 4]
+
+    # G2가 없는 팀(G3 2명)에는 무조건 G1 저학년 배치
+    for i in range(num_no_g2):
         if g1_low: teams[i].append(g1_low.pop(0))
         elif g1_high: teams[i].append(g1_high.pop(0))
 
-    # 나머지 팀에는 G1과 G2를 배타적으로 배치 (겹치지 않게)
-    g2_pool = g2_f + g2_m
-    g1_rem = g1_high + g1_low
-    for i in range(num_no_g2_teams, num_teams):
+    # 나머지 팀에 남은 G1 모두 1명씩 배치
+    g1_rem = g1_low + g1_high
+    for i in range(num_no_g2, num_teams):
         if g1_rem: teams[i].append(g1_rem.pop(0))
-        if g2_pool: teams[i].append(g2_pool.pop(0))
 
-    # [3] 여학생 분산 배치 (팀당 여학생 최대 2명)
-    all_assigned_ids = [m['학번'] for t in teams for m in t]
-    rem_f = [x for x in (g3_f + g2_f + g1_low + g1_high) if x['학번'] not in all_assigned_ids and x['성별'] == '여']
-    rem_m = [x for x in (g3_m + g2_m + g1_low + g1_high) if x['학번'] not in all_assigned_ids and x['성별'] == '남']
-    random.shuffle(rem_f); random.shuffle(rem_m)
+    # [2] G2 배치 시 1차 성별 밸런싱
+    g2_targets = teams[num_no_g2:num_teams]
+    # G2 여학생을 먼저 배정하기 위해 정렬
+    g2_sorted = sorted(g2, key=lambda x: 0 if x['성별'] == '여' else 1)
+    
+    for student in g2_sorted:
+        # 배정 직전마다 '현재 여학생 수가 가장 적은 팀'을 맨 앞으로 정렬
+        g2_targets.sort(key=lambda t: len([m for m in t if m['성별'] == '여']))
+        g2_targets[0].append(student)
 
-    for i in range(num_teams):
-        while len(teams[i]) < 3:
-            curr_f = len([m for m in teams[i] if m['성별'] == '여'])
-            if curr_f < 2 and rem_f:
-                teams[i].append(rem_f.pop(0))
-            elif rem_m:
-                teams[i].append(rem_m.pop(0))
-            elif rem_f: # 남학생 부족 시 어쩔 수 없이 3여 방지보다 인원 우선
-                teams[i].append(rem_f.pop(0))
-            else: break
-            
+    # [3] G3 배치 시 최종 성별 밸런싱 (이 부분이 해결의 핵심입니다)
+    g3_sorted = sorted(g3, key=lambda x: 0 if x['성별'] == '여' else 1)
+    
+    while g3_sorted:
+        needs_member = [t for t in teams if len(t) < 3]
+        if not needs_member: break
+        
+        student = g3_sorted.pop(0)
+
+        if student['성별'] == '여':
+            # 여학생은 여학생이 가장 '없는' 팀을 찾아 들어감
+            needs_member.sort(key=lambda t: len([m for m in t if m['성별'] == '여']))
+        else:
+            # 남학생은 반대로 여학생이 '많은' 팀을 우선 채워 남녀 비율을 희석시킴
+            needs_member.sort(key=lambda t: len([m for m in t if m['성별'] == '여']), reverse=True)
+
+        needs_member[0].append(student)
+
     random.shuffle(teams)
     return teams
 
@@ -120,25 +115,23 @@ uploaded_file = st.file_uploader("명단 CSV 업로드", type=["csv"])
 if uploaded_file:
     df_raw = pd.read_csv(uploaded_file, skiprows=7)
     try:
-        # 순서: 그룹(0), 순번(1), 학년(2), 학과(3), 학번(4), 성별(5), 성명(6)
         df_clean = df_raw.iloc[:, [0, 5, 2, 3, 4, 6]].dropna(subset=[df_raw.columns[0], df_raw.columns[6]])
         df_clean.columns = ['그룹', '성별', '학년', '학과', '학번', '성명']
     except:
-        st.error("CSV 컬럼 구조가 맞지 않습니다. (그룹, 순번, 학년, 학과, 학번, 성별, 성명 순서여야 합니다)")
+        st.error("CSV 컬럼 구조가 맞지 않습니다.")
         st.stop()
 
     if 'current_team_idx' not in st.session_state: st.session_state.current_team_idx = 0
     if 'teams_list' not in st.session_state: st.session_state.teams_list = []
     if 'stage' not in st.session_state: st.session_state.stage = "READY"
 
-    # 보드 고정
     announcement_placeholder = st.empty()
     if st.session_state.stage == "READY" and st.session_state.current_team_idx == 0:
         announcement_placeholder.markdown('<div class="announcement-fixed-box"><div class="announcement-title">Welcome</div><p>팀 구성을 생성한 뒤 발표를 시작하세요.</p></div>', unsafe_allow_html=True)
 
     c_btn = st.columns([1, 4])
     if c_btn[0].button("🔥 전체 팀 구성 생성"):
-        st.session_state.teams_list = create_balanced_teams(df_clean)
+        st.session_state.teams_list = create_perfectly_balanced_teams(df_clean)
         st.session_state.current_team_idx = 0
         st.session_state.stage = "READY"
         st.rerun()
@@ -150,12 +143,11 @@ if uploaded_file:
                     st.session_state.stage = "DRAWING"
                     st.rerun()
             elif st.session_state.stage == "FINISHED":
-                if st.button(f"✅ {st.session_state.current_team_idx + 1}팀 명단 확정 및 추가"):
+                if st.button(f"✅ {st.session_state.current_team_idx + 1}팀 명단 확정"):
                     st.session_state.current_team_idx += 1
                     st.session_state.stage = "READY"
                     st.rerun()
 
-        # 발표 애니메이션
         if st.session_state.stage == "DRAWING":
             idx = st.session_state.current_team_idx
             members = st.session_state.teams_list[idx]
@@ -180,7 +172,6 @@ if uploaded_file:
             cards = "".join([f'<div class="new-member-card"><div class="new-member-name">{m["성명"]}</div><div style="color:{"#ff6b6b" if m["성별"]=="여" else "#4dabf7"}; font-weight:bold; font-size:1.2em;">{m["성별"]} | {int(m["학년"])}학년</div><div class="new-member-info">G{int(m["그룹"])} | {m["학과"]}</div></div>' for m in members])
             announcement_placeholder.markdown(f'<div class="announcement-fixed-box"><div class="announcement-title">✨ {idx+1}팀 구성 완료! ✨</div><div style="display:flex; gap:20px;">{cards}</div></div>', unsafe_allow_html=True)
 
-        # 하단 리스트 (최신순)
         if st.session_state.current_team_idx > 0:
             st.divider()
             st.subheader("📋 확정된 팀 명단 (최신순)")
@@ -192,7 +183,6 @@ if uploaded_file:
                 m_html = "".join([f'<div class="member-row {"g1-bg" if float(m["그룹"])==1.0 else ""}"><div><b style="font-size:1.1em;">{m["성명"]}</b> ({"<span class=\"gender-f\">여</span>" if m["성별"]=="여" else "<span class=\"gender-m\">남</span>"})</div><div style="font-size:0.85em; color:gray;">G{int(m["그룹"])} | {int(m["학년"])}학년 | {m["학과"]}</div></div>' for m in team])
                 t_cols[v_idx % 3].markdown(f'<div class="team-card"><div class="team-title">TEAM {r_idx+1}</div>{m_html}</div>', unsafe_allow_html=True)
 
-    # 그룹 현황 리스트
     st.divider()
     with st.expander("👥 그룹별 학생 명단 보기"):
         c1, c2, c3 = st.columns(3)
