@@ -90,10 +90,17 @@ if uploaded_file:
                 for m in t_obj['members']:
                     is_g1 = "g1-bg" if m['그룹'] == 1 else ""
                     badge = '<span class="badge badge-g1">G1</span>' if m['그룹'] == 1 else ""
+                    
+                    # 학번 포맷팅: .0을 제거하고 정수형 문자열로 변환
+                    try:
+                        student_id = str(int(float(m['학번']))) 
+                    except:
+                        student_id = str(m['학번'])
+                        
                     members_html += f"""
                     <div class="member-row {is_g1}">
                         <span class="member-name">{m['성명']}</span> {badge}<br>
-                        <span class="member-info">{int(m['학년'])}학년 | {m['학번']} | {m['학과']}</span>
+                        <span class="member-info">{int(m['학년'])}학년 | {student_id} | {m['학과']}</span>
                     </div>
                     """
                 
