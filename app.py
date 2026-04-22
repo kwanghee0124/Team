@@ -34,9 +34,6 @@ st.markdown("""
     .leader-bg { background-color: #fff9db; border-left: 5px solid #fab005; } 
     .normal-bg { background-color: #f8f9fa; border-left: 5px solid #ced4da; }
     
-    .gender-f { color: #ff6b6b; font-weight: bold; }
-    .gender-m { color: #4dabf7; font-weight: bold; }
-    
     .student-card {
         background-color: #ffffff; border-radius: 8px; padding: 8px;
         margin: 4px; border: 1px solid #e1e4e8; display: inline-block;
@@ -131,8 +128,8 @@ if uploaded_file:
         st.error("CSV 컬럼 구조가 맞지 않습니다.")
         st.stop()
 
-    # 상단: 그룹별 학생 명단 보기 및 수정창
-    with st.expander("👥 그룹별 학생 현황 및 명단 수정", expanded=True):
+    # 상단: 명단 수정창 (기본 최소화)
+    with st.expander("📝 그룹별 학생 현황 및 명단 수정 (클릭하여 열기)", expanded=False):
         st.info("💡 표에서 학생의 **'그룹' 열을 더블클릭**하여 수정하세요. 수정한 즉시 아래의 그룹별 카드 현황에 반영됩니다.")
         
         edited_df = st.data_editor(
@@ -157,10 +154,12 @@ if uploaded_file:
             g_data = edited_df[edited_df['그룹'] == float(g_num)].sort_values(by=['학년', '학번'])
             inner = ""
             for _, r in g_data.iterrows():
-                gender_str = "여" if r["성별"] == "여" else "남"
-                inner += f'<div class="student-card"><div style="color:#1f77b4; font-size:0.8em; font-weight:bold;">{r["학과"]}</div><div style="font-weight:bold;">{r["성명"]} ({gender_str})</div><div style="font-size:0.75em; color:gray;">{int(r["학년"])}학년 | {str(int(float(r["학번"])))}</div></div>'
-                
-            col.markdown(f'<div class="group-container"><h4>Group {g_num} ({len(g_data)}명)</h4>{inner}</div>', unsafe_allow_html=True)
+                # GUI에서 성별 글자 제거, G1인 경우 이름 옆에 리더 뱃지 추가
+                role_badge = '<span style="color:#fab005; font-size:0.85em; margin-left:5px;">👑 리더</span>' if g_num == 1 else ''
+                inner += f'<div class="student-card"><div style="color:#1f77b4; font-size:0.8em; font-weight:bold;">{r["학과"]}</div><div style="font-weight:bold;">{r["성명"]}{role_badge}</div><div style="font-size:0.75em; color:gray;">{int(r["학년"])}학년 | {str(int(float(r["학번"])))}</div></div>'
+            
+            group_title = f"Group 1 (👑 리더 그룹, {len(g_data)}명)" if g_num == 1 else f"Group {g_num} ({len(g_data)}명)"
+            col.markdown(f'<div class="group-container"><h4>{group_title}</h4>{inner}</div>', unsafe_allow_html=True)
             
     st.divider()
 
@@ -169,12 +168,11 @@ if uploaded_file:
     if 'teams_list' not in st.session_state: st.session_state.teams_list = []
     if 'stage' not in st.session_state: st.session_state.stage = "READY"
 
-    # [포인트] 메인 보드용 플레이스홀더를 하나만 생성해서 재활용합니다.
     announcement_placeholder = st.empty()
     
     if st.session_state.stage == "READY":
         if st.session_state.current_team_idx == 0:
-            announcement_placeholder.markdown('<div class="announcement-fixed-box"><div class="announcement-title">Welcome</div><p style="color:#ccc; font-size:1.2em;">위에서 명단 확인 및 수정을 마친 뒤, 아래 버튼을 눌러 전체 팀 구성을 생성하세요.</p></div>', unsafe_allow_html=True)
+            announcement_placeholder.markdown('<div class="announcement-fixed-box"><div class="announcement-title">Welcome</div><p style="color:#ccc; font-size:1.2em;">전체 팀 구성을 생성한 뒤 발표를 시작하세요.</p></div>', unsafe_allow_html=True)
         elif st.session_state.current_team_idx < 15:
             announcement_placeholder.markdown(f'<div class="announcement-fixed-box"><div class="announcement-title">✔️ {st.session_state.current_team_idx}팀 확정 완료!</div><p style="color:#fab005; font-size:1.2em; font-weight:bold;">➡️ 다음 {st.session_state.current_team_idx + 1}팀 발표를 시작해주세요.</p></div>', unsafe_allow_html=True)
         else:
@@ -182,11 +180,8 @@ if uploaded_file:
 
     c_btn = st.columns([1, 4])
     
-    # 전체 팀 구성 버튼 클릭
     if c_btn[0].button("🔥 전체 팀 구성 생성"):
         slots = ["🍒", "🍋", "🔔", "⭐", "💎", "7️⃣", "🍀", "🍉"]
-        
-        # [수정됨] 새로운 박스를 만들지 않고, 기존 announcement_placeholder에 덮어씁니다.
         for _ in range(15):
             s1, s2, s3 = random.choice(slots), random.choice(slots), random.choice(slots)
             announcement_placeholder.markdown(f'<div class="announcement-fixed-box"><div class="announcement-title">🔥 완벽한 밸런스를 계산 중입니다...</div><div class="slot-machine">{s1} {s2} {s3}</div></div>', unsafe_allow_html=True)
@@ -221,10 +216,10 @@ if uploaded_file:
                     announcement_placeholder.markdown(f'<div class="announcement-fixed-box"><div class="announcement-title">📢 {idx+1}팀 멤버 추첨 중!</div><div style="display:flex; gap:20px;">{confirmed_cards}{r_html}</div></div>', unsafe_allow_html=True)
                     time.sleep(0.06)
                 
-                g_color = "#ff6b6b" if target['성별'] == '여' else "#4dabf7"
-                role_badge = '<span style="color:#fab005; font-size:1.2em;">👑 리더 (G1)</span>' if m_idx == 0 else f'<span>팀원 (G{int(target["그룹"])})</span>'
+                role_badge = '<span style="color:#fab005; font-size:1.2em;">👑 리더 (G1)</span>' if m_idx == 0 else f'<span style="color:#e0e0e0;">팀원 (G{int(target["그룹"])})</span>'
                 
-                confirmed_cards += f'<div class="new-member-card"><div style="margin-bottom:10px;">{role_badge}</div><div class="new-member-name">{target["성명"]}</div><div style="color:{g_color}; font-weight:bold; font-size:1.2em;">{target["성별"]} | {int(target["학년"])}학년</div><div class="new-member-info">{target["학과"]}</div></div>'
+                # GUI에서 성별 텍스트 및 색상 완전 제거
+                confirmed_cards += f'<div class="new-member-card"><div style="margin-bottom:10px;">{role_badge}</div><div class="new-member-name">{target["성명"]}</div><div style="color:#fff; font-weight:bold; font-size:1.1em; margin-bottom:5px;">{int(target["학년"])}학년</div><div class="new-member-info">{target["학과"]}</div></div>'
                 announcement_placeholder.markdown(f'<div class="announcement-fixed-box"><div class="announcement-title">📢 {idx+1}팀 멤버 추첨 중!</div><div style="display:flex; gap:20px;">{confirmed_cards}</div></div>', unsafe_allow_html=True)
                 time.sleep(0.4)
             st.session_state.stage = "FINISHED"
@@ -237,10 +232,10 @@ if uploaded_file:
             
             cards = ""
             for i, m in enumerate(members):
-                role_badge = '<span style="color:#fab005; font-size:1.2em;">👑 리더 (G1)</span>' if i == 0 else f'<span>팀원 (G{int(m["그룹"])})</span>'
-                g_color = "#ff6b6b" if m["성별"] == "여" else "#4dabf7"
+                role_badge = '<span style="color:#fab005; font-size:1.2em;">👑 리더 (G1)</span>' if i == 0 else f'<span style="color:#e0e0e0;">팀원 (G{int(m["그룹"])})</span>'
                 
-                cards += f'<div class="new-member-card"><div style="margin-bottom:10px;">{role_badge}</div><div class="new-member-name">{m["성명"]}</div><div style="color:{g_color}; font-weight:bold; font-size:1.2em;">{m["성별"]} | {int(m["학년"])}학년</div><div class="new-member-info">{m["학과"]}</div></div>'
+                # GUI에서 성별 텍스트 및 색상 완전 제거
+                cards += f'<div class="new-member-card"><div style="margin-bottom:10px;">{role_badge}</div><div class="new-member-name">{m["성명"]}</div><div style="color:#fff; font-weight:bold; font-size:1.1em; margin-bottom:5px;">{int(m["학년"])}학년</div><div class="new-member-info">{m["학과"]}</div></div>'
                 
             announcement_placeholder.markdown(f'<div class="announcement-fixed-box"><div class="announcement-title">✨ {idx+1}팀 구성 완료! ✨</div><div style="display:flex; gap:20px;">{cards}</div></div>', unsafe_allow_html=True)
 
@@ -258,8 +253,8 @@ if uploaded_file:
                 for i, m in enumerate(team):
                     bg_class = "leader-bg" if i == 0 else "normal-bg"
                     badge = '<span style="background:#fab005; color:white; padding:2px 6px; border-radius:4px; font-size:0.7em;">👑 G1 리더</span>' if i == 0 else f'<span style="background:#ced4da; color:white; padding:2px 6px; border-radius:4px; font-size:0.7em;">G{int(m["그룹"])}</span>'
-                    gender_span = '<span class="gender-f">여</span>' if m["성별"] == "여" else '<span class="gender-m">남</span>'
                     
-                    m_html += f'<div class="member-row {bg_class}"><div><b style="font-size:1.1em;">{m["성명"]}</b> ({gender_span}) {badge}</div><div style="font-size:0.85em; color:gray;">{int(m["학년"])}학년 | {m["학과"]}</div></div>'
+                    # GUI에서 성별 텍스트 제거
+                    m_html += f'<div class="member-row {bg_class}"><div><b style="font-size:1.1em;">{m["성명"]}</b> {badge}</div><div style="font-size:0.85em; color:gray;">{int(m["학년"])}학년 | {m["학과"]}</div></div>'
                 
                 t_cols[v_idx % 3].markdown(f'<div class="team-card"><div class="team-title">TEAM {r_idx+1}</div>{m_html}</div>', unsafe_allow_html=True)
