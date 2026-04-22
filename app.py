@@ -42,7 +42,6 @@ def get_final_teams(df_clean):
     g2 = df_clean[df_clean['그룹'] == 2.0].sample(frac=1).to_dict('records')
     g3 = df_clean[df_clean['그룹'] == 3.0].sample(frac=1).to_dict('records')
     g1_3rd = [s for s in g1 if float(s['학년']) < 4]; g1_4th = [s for s in g1 if float(s['학년']) >= 4]
-    
     teams = []
     for _ in range(2):
         leader = g1_3rd.pop() if g1_3rd else g1_4th.pop()
@@ -65,7 +64,7 @@ if uploaded_file:
     df_clean = df_raw.iloc[:, [0, 2, 3, 4, 37]].dropna(subset=[df_raw.columns[0], df_raw.columns[37]])
     df_clean.columns = ['그룹', '학년', '학과', '학번', '성명']
 
-    # 1. 그룹별 참여 학생 현황
+    # 1. 그룹별 학생 현황
     st.subheader("👥 그룹별 참여 학생 현황")
     c1, c2, c3 = st.columns(3)
     for g_num, col in zip([1, 2, 3], [c1, c2, c3]):
@@ -75,7 +74,7 @@ if uploaded_file:
 
     st.divider()
 
-    # 2. 세션 상태 관리
+    # 2. 상태 관리
     if 'current_team_idx' not in st.session_state: st.session_state.current_team_idx = 0
     if 'teams_list' not in st.session_state: st.session_state.teams_list = []
     if 'last_drawn_idx' not in st.session_state: st.session_state.last_drawn_idx = -1
@@ -88,16 +87,17 @@ if uploaded_file:
 
     if st.session_state.teams_list:
         btn_placeholder = st.empty()
+        
+        # 버튼 클릭 로직
         if st.session_state.current_team_idx < 15:
-            # [수정] 버튼 클릭 시 즉시 인덱스를 올리고 rerun하여 레이아웃을 먼저 밀어냄
             if btn_placeholder.button(f"➡️ {st.session_state.current_team_idx + 1}팀 추첨하기"):
                 st.session_state.current_team_idx += 1
-                st.rerun()
-        
+                st.rerun() # 여기서 리런하면 기존 팀들이 먼저 밀려난 상태로 아래 루프 진입
+
         st.subheader(f"🎊 배정 결과 (최신순)")
         t_cols = st.columns(3)
         
-        # 최신순 정렬 (LIFO)
+        # 최신순 리스트 준비
         display_indices = list(range(st.session_state.current_team_idx))
         display_indices.reverse()
 
@@ -105,27 +105,27 @@ if uploaded_file:
             col_target = t_cols[visual_idx % 3]
             team_members = st.session_state.teams_list[real_idx]
             
-            # 방금 버튼 클릭으로 '자리만' 생기고 아직 추첨 전인 경우
-            if real_idx == st.session_state.current_team_idx - 1 and st.session_state.last_drawn_idx < real_idx:
-                with col_target:
+            with col_target:
+                # [수정 핵심] 애니메이션이 필요한 새 팀인 경우
+                if real_idx == st.session_state.current_team_idx - 1 and st.session_state.last_drawn_idx < real_idx:
                     placeholder = st.empty()
                     confirmed_html = ""
+                    # 추첨 중인 상태를 보여주기 위해 루프 실행
                     for m_idx, final_m in enumerate(team_members):
                         for _ in range(5):
                             temp = df_clean.sample(1).iloc[0]
                             temp_row = f'<div class="member-row" style="border: 1px dashed #ccc;"><div class="roulette-text">🎲 추첨 중...</div><div style="color:#aaa;">{temp["성명"]}</div></div>'
-                            placeholder.markdown(f'<div class="team-card-base new-team-card"><div class="team-title">TEAM {real_idx+1} (추첨 중)</div>{confirmed_html}{temp_row}</div>', unsafe_allow_html=True)
+                            placeholder.markdown(f'<div class="team-card-base new-team-card"><div class="team-title">TEAM {real_idx+1} (Drawing...)</div>{confirmed_html}{temp_row}</div>', unsafe_allow_html=True)
                             time.sleep(0.06)
                         
                         is_g1 = "g1-bg" if float(final_m['그룹']) == 1.0 else ""
                         badge = '<span class="badge">G1</span>' if float(final_m['그룹']) == 1.0 else ""
                         confirmed_html += f'<div class="member-row {is_g1}"><div><span class="member-name">{final_m["성명"]}</span>{badge}</div><div style="font-size:0.8em; color:gray;">{int(final_m["학년"])}학년 | {str(int(float(final_m["학번"])))} | {final_m["학과"]}</div></div>'
-                        placeholder.markdown(f'<div class="team-card-base new-team-card"><div class="team-title">TEAM {real_idx+1} (추첨 중)</div>{confirmed_html}</div>', unsafe_allow_html=True)
+                        placeholder.markdown(f'<div class="team-card-base new-team-card"><div class="team-title">TEAM {real_idx+1} (Drawing...)</div>{confirmed_html}</div>', unsafe_allow_html=True)
                     
                     st.session_state.last_drawn_idx = real_idx
-                    st.rerun() # 모든 추첨 완료 후 최종 상태로 갱신 (제목 등)
-            else:
-                # 이미 뽑힌 팀들 (이미 밀려나 있는 상태)
-                with col_target:
+                    st.rerun() # 마지막 확정 상태로 제목 변경 등을 위해 리런
+                else:
+                    # 기존 팀들은 이미 밀려난 자리에서 즉시 출력
                     m_html = "".join([f'<div class="member-row {"g1-bg" if float(m["그룹"])==1.0 else ""}"><div><span class="member-name">{m["성명"]}</span>{"<span class=\"badge\">G1</span>" if float(m["그룹"])==1.0 else ""}</div><div style="font-size:0.8em; color:gray;">{int(m["학년"])}학년 | {str(int(float(m["학번"])))} | {m["학과"]}</div></div>' for m in team_members])
                     st.markdown(f'<div class="team-card-base old-team-card"><div class="team-title" style="color:#666; border-bottom: 2px solid #ccc;">TEAM {real_idx+1}</div>{m_html}</div>', unsafe_allow_html=True)
