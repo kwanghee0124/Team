@@ -35,6 +35,9 @@ st.markdown("""
     .leader-bg { background-color: #fff9db; border-left: 5px solid #fab005; } 
     .normal-bg { background-color: #f8f9fa; border-left: 5px solid #ced4da; }
     
+    .gender-f { color: #ff6b6b; font-weight: bold; }
+    .gender-m { color: #4dabf7; font-weight: bold; }
+    
     .student-card {
         background-color: #ffffff; border-radius: 8px; padding: 8px;
         margin: 4px; border: 1px solid #e1e4e8; display: inline-block;
@@ -57,7 +60,6 @@ def create_perfectly_balanced_teams(df_clean):
 
     random.shuffle(g1); random.shuffle(g2); random.shuffle(g3)
 
-    # 전체 학생 수를 3으로 나누어 총 생성할 팀 개수를 확정
     total_students = len(df_clean)
     num_teams = max(len(g1), total_students // 3)
     
@@ -65,14 +67,12 @@ def create_perfectly_balanced_teams(df_clean):
     
     teams = [[] for _ in range(num_teams)]
     
-    # 1. G1 리더 배정 (G1 인원수만큼만 들어감)
     for i, leader in enumerate(g1):
         teams[i].append(leader)
 
     def get_grade_level(s):
         return "high" if float(s['학년']) >= 3 else "low"
 
-    # 2. G2 배정 (반드시 G1 리더가 있는 팀에만 배정, 한 팀에 1명만)
     g2_unassigned = []
     
     for student in g2:
@@ -80,16 +80,13 @@ def create_perfectly_balanced_teams(df_clean):
         best_score = -1
         
         for t in teams:
-            # G1 리더가 존재하고, 아직 G2가 안 들어간 팀 찾기
             if len(t) > 0 and t[0]['그룹'] == 1.0 and not any(m['그룹'] == 2.0 for m in t):
                 leader = t[0]
                 score = 0
                 
-                # 조건 1: 학년 크로스 (고학년-저학년 매칭, 가장 중요)
                 if get_grade_level(leader) != get_grade_level(student):
                     score += 100
                 
-                # 조건 2: 성별 크로스 매칭 (남-여 매칭)
                 if leader['성별'] != student['성별']:
                     score += 10
                     
@@ -102,8 +99,6 @@ def create_perfectly_balanced_teams(df_clean):
         else:
             g2_unassigned.append(student)
 
-    # 3. 빈자리 및 G3 채우기 (전체 성비 균형)
-    # G1이 없는 팀(빈 배열)은 자연스럽게 남은 인원들(G3 위주)로 채워짐
     leftovers = g2_unassigned + g3
     f_left = [x for x in leftovers if x['성별'] == '여']
     m_left = [x for x in leftovers if x['성별'] == '남']
@@ -126,7 +121,6 @@ def create_perfectly_balanced_teams(df_clean):
             valid_teams[0].append(student)
             m_left.remove(student)
 
-    # 혹시 남은 인원이 있다면 (43명 등 3배수 초과일 경우) 인원이 가장 적은 팀에 분산
     for student in f_left + m_left:
         teams.sort(key=lambda t: len(t))
         teams[0].append(student)
@@ -142,7 +136,6 @@ uploaded_file = st.file_uploader("명단 CSV 업로드", type=["csv"])
 if uploaded_file:
     df_raw = pd.read_csv(uploaded_file, skiprows=7)
     try:
-        # 컬럼 위치가 바뀌어도 키워드로 자동 추적
         col_group = next(c for c in df_raw.columns if '그룹' in c)
         col_gender = next(c for c in df_raw.columns if '성별' in c)
         col_grade = next(c for c in df_raw.columns if '학년' in c)
@@ -187,7 +180,9 @@ if uploaded_file:
         inner = ""
         for _, r in g_data.iterrows():
             role_badge = '<span style="color:#fab005; font-size:0.85em; margin-left:5px;">👑 리더</span>' if g_num == 1 else ''
-            inner += f'<div class="student-card"><div style="color:#1f77b4; font-size:0.8em; font-weight:bold;">{r["학과"]}</div><div style="font-weight:bold;">{r["성명"]}{role_badge}</div><div style="font-size:0.75em; color:gray;">{int(float(r["학년"]))}학년 | {str(int(float(r["학번"])))}</div></div>'
+            # [추가] 성별 확인
+            gender_str = "여" if r["성별"] == "여" else "남"
+            inner += f'<div class="student-card"><div style="color:#1f77b4; font-size:0.8em; font-weight:bold;">{r["학과"]}</div><div style="font-weight:bold;">{r["성명"]} ({gender_str}){role_badge}</div><div style="font-size:0.75em; color:gray;">{int(float(r["학년"]))}학년 | {str(int(float(r["학번"])))}</div></div>'
         
         group_title = f"Group 1 (👑 리더 그룹, {len(g_data)}명)" if g_num == 1 else f"Group {g_num} ({len(g_data)}명)"
         col.markdown(f'<div class="group-container"><h4>{group_title}</h4>{inner}</div>', unsafe_allow_html=True)
@@ -236,7 +231,6 @@ if uploaded_file:
                     st.session_state.stage = "READY"
                     st.rerun()
 
-        # 발표 애니메이션
         if st.session_state.stage == "DRAWING":
             idx = st.session_state.current_team_idx
             members = st.session_state.teams_list[idx]
@@ -248,19 +242,19 @@ if uploaded_file:
                     announcement_placeholder.markdown(f'<div class="announcement-fixed-box"><div class="announcement-title">📢 {idx+1}팀 멤버 추첨 중!</div><div style="display:flex; gap:20px;">{confirmed_cards}{r_html}</div></div>', unsafe_allow_html=True)
                     time.sleep(0.06)
                 
-                # G1인 학생만 리더 표기
                 if target['그룹'] == 1.0:
                     role_badge = '<span style="color:#fab005; font-size:1.2em;">👑 리더 (G1)</span>'
                 else:
                     role_badge = f'<span style="color:#e0e0e0;">팀원 (G{int(target["그룹"])})</span>'
                 
-                confirmed_cards += f'<div class="new-member-card"><div style="margin-bottom:10px;">{role_badge}</div><div class="new-member-name">{target["성명"]}</div><div style="color:#fff; font-weight:bold; font-size:1.1em; margin-bottom:5px;">{int(float(target["학년"]))}학년</div><div class="new-member-info">{target["학과"]}</div></div>'
+                # [추가] 카드 성별 확인 (빨강/파랑 색상)
+                g_color = "#ff6b6b" if target['성별'] == '여' else "#4dabf7"
+                confirmed_cards += f'<div class="new-member-card"><div style="margin-bottom:10px;">{role_badge}</div><div class="new-member-name">{target["성명"]}</div><div style="color:{g_color}; font-weight:bold; font-size:1.1em; margin-bottom:5px;">{target["성별"]} | {int(float(target["학년"]))}학년</div><div class="new-member-info">{target["학과"]}</div></div>'
                 announcement_placeholder.markdown(f'<div class="announcement-fixed-box"><div class="announcement-title">📢 {idx+1}팀 멤버 추첨 중!</div><div style="display:flex; gap:20px;">{confirmed_cards}</div></div>', unsafe_allow_html=True)
                 time.sleep(0.4)
             st.session_state.stage = "FINISHED"
             st.rerun()
 
-        # 완료 화면
         if st.session_state.stage == "FINISHED":
             idx = st.session_state.current_team_idx
             members = st.session_state.teams_list[idx]
@@ -272,18 +266,18 @@ if uploaded_file:
                 else:
                     role_badge = f'<span style="color:#e0e0e0;">팀원 (G{int(m["그룹"])})</span>'
                 
-                cards += f'<div class="new-member-card"><div style="margin-bottom:10px;">{role_badge}</div><div class="new-member-name">{m["성명"]}</div><div style="color:#fff; font-weight:bold; font-size:1.1em; margin-bottom:5px;">{int(float(m["학년"]))}학년</div><div class="new-member-info">{m["학과"]}</div></div>'
+                # [추가] 카드 성별 확인 (빨강/파랑 색상)
+                g_color = "#ff6b6b" if m['성별'] == '여' else "#4dabf7"
+                cards += f'<div class="new-member-card"><div style="margin-bottom:10px;">{role_badge}</div><div class="new-member-name">{m["성명"]}</div><div style="color:{g_color}; font-weight:bold; font-size:1.1em; margin-bottom:5px;">{m["성별"]} | {int(float(m["학년"]))}학년</div><div class="new-member-info">{m["학과"]}</div></div>'
                 
             announcement_placeholder.markdown(f'<div class="announcement-fixed-box"><div class="announcement-title">✨ {idx+1}팀 구성 완료! ✨</div><div style="display:flex; gap:20px;">{cards}</div></div>', unsafe_allow_html=True)
 
-        # 확정된 팀 명단 (최신순) 및 CSV 다운로드
         if st.session_state.current_team_idx > 0:
             st.divider()
             
             c_title, c_down = st.columns([3, 1])
             c_title.subheader("📋 확정된 팀 명단 (최신순)")
             
-            # 모든 팀이 확정되었을 때만 다운로드 버튼 표시
             if st.session_state.current_team_idx == total_teams:
                 export_data = []
                 for t_idx, team in enumerate(st.session_state.teams_list):
@@ -317,7 +311,6 @@ if uploaded_file:
                 
                 m_html = ""
                 for i, m in enumerate(team):
-                    # G1 학생에게만 노란 배경과 리더 뱃지 부여
                     if m['그룹'] == 1.0:
                         bg_class = "leader-bg"
                         badge = '<span style="background:#fab005; color:white; padding:2px 6px; border-radius:4px; font-size:0.7em;">👑 G1 리더</span>'
@@ -325,6 +318,8 @@ if uploaded_file:
                         bg_class = "normal-bg"
                         badge = f'<span style="background:#ced4da; color:white; padding:2px 6px; border-radius:4px; font-size:0.7em;">G{int(m["그룹"])}</span>'
                     
-                    m_html += f'<div class="member-row {bg_class}"><div><b style="font-size:1.1em;">{m["성명"]}</b> {badge}</div><div style="font-size:0.85em; color:gray;">{int(float(m["학년"]))}학년 | {m["학과"]}</div></div>'
+                    # [추가] 리스트 성별 확인
+                    gender_span = '<span class="gender-f">여</span>' if m["성별"] == "여" else '<span class="gender-m">남</span>'
+                    m_html += f'<div class="member-row {bg_class}"><div><b style="font-size:1.1em;">{m["성명"]}</b> ({gender_span}) {badge}</div><div style="font-size:0.85em; color:gray;">{int(float(m["학년"]))}학년 | {m["학과"]}</div></div>'
                 
                 t_cols[v_idx % 3].markdown(f'<div class="team-card"><div class="team-title">TEAM {r_idx+1}</div>{m_html}</div>', unsafe_allow_html=True)
